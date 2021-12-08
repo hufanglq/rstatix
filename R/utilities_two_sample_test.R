@@ -99,8 +99,22 @@ two_sample_test <- function(data, formula, method = "t.test", ref.group = NULL, 
   }
 
   statistic <- p <- NULL
-  res <- suppressWarnings(do.call(test.function, test.args)) %>%
-    as_tidy_stat() %>%
+  res <- suppressWarnings(
+    tryCatch({do.call(test.function, test.args)},
+             error=function(e){
+               if(test.function %in% c('t.test', 'wilcox.test')){
+                 stat.t <- do.call(test.function, list(x = 1:3, y = 1:3, ...))
+                 stat.t$statistic <- stat.t$parameter <- stat.t$p.value <-  stat.t$null.value <-
+                   stat.t$stderr <- NA
+                 stat.t$conf.int[1] <-  stat.t$conf.int[2] <-
+                   stat.t$estimate[1] <-  stat.t$estimate[2] <- NA
+                 #x=x; y=y
+                 stat.t$data.name <- paste0(enquote(x), ' and ', enquote(y))[2]
+                 stat.t
+               }
+             })
+  )
+  res <- res %>% as_tidy_stat() %>%
     add_columns(
       .y. = outcome, group1 = grp1, group2 = grp2,
       .before = "statistic"
